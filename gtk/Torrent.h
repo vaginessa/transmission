@@ -10,6 +10,7 @@
 #include <libtransmission/transmission.h>
 
 #include <giomm/icon.h>
+#include <glibmm/extraclassinit.h>
 #include <glibmm/object.h>
 #include <glibmm/refptr.h>
 #include <glibmm/ustring.h>
@@ -21,7 +22,9 @@
 #include <memory>
 #include <vector>
 
-class Torrent : public Glib::Object
+class Torrent
+    : public Glib::ExtraClassInit
+    , public Glib::Object
 {
 public:
     class Columns : public Gtk::TreeModelColumnRecord
@@ -98,6 +101,7 @@ public:
     Glib::ustring get_long_progress_text() const;
     Glib::ustring get_long_status_text() const;
     bool get_sensitive() const;
+    std::vector<Glib::ustring> get_css_classes() const;
 
     ChangeFlags update();
 

@@ -40,6 +40,12 @@ set(${PROJECT_NAME}_UI_FILES
     ${UI_SUBDIR}/TorrentUrlChooserDialog.ui
 )
 
+if(GTK_VERSION EQUAL 4)
+    list(APPEND ${PROJECT_NAME}_UI_FILES
+        ${UI_SUBDIR}/TorrentListItemCompact.ui
+        ${UI_SUBDIR}/TorrentListItemFull.ui)
+endif()
+
 macro(gtr_compile_resources NAME INPUT_DIR INPUT_FILE OUTPUT_FILE_BASE)
     add_custom_command(
         OUTPUT
@@ -133,16 +139,24 @@ set(${PROJECT_NAME}_SOURCES
     ${CMAKE_CURRENT_BINARY_DIR}/transmission-ui-resources.c
 )
 
+if(GTK_VERSION EQUAL 4)
+    set_property(
+        SOURCE TorrentCellRenderer.cc
+        PROPERTY HEADER_FILE_ONLY ON)
+endif()
+
 set(${PROJECT_NAME}_HEADERS
     Actions.h
     Application.h
     DetailsDialog.h
     Dialogs.h
+    DynamicProperty.h
     FaviconCache.h
     FileList.h
     FilterBar.h
     Flags.h
     FreeSpaceLabel.h
+    GtkCompat.h
     HigWorkarea.h
     IconCache.h
     ListModelAdapter.h

@@ -536,7 +536,7 @@ Session::Impl::Impl(Session& core, tr_session* session)
     , session_(session)
 {
     raw_model_ = Gio::ListStore<Torrent>::create();
-    signal_torrents_changed_.connect(sigc::hide<0>(sigc::mem_fun(*sorter_.get(), &TorrentSorter::update)));
+    signal_torrents_changed_.connect(sigc::hide<0>(sigc::mem_fun(*sorter_, &TorrentSorter::update)));
 #if GTKMM_CHECK_VERSION(4, 0, 0)
     sorted_model_ = Gtk::SortListModel::create(raw_model_, sorter_);
 #else

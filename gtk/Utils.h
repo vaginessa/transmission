@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "GtkCompat.h"
+
 #include <libtransmission/transmission.h>
 #include <libtransmission/tr-macros.h>
 
@@ -20,6 +22,10 @@
 #include <gtkmm/widget.h>
 #include <gtkmm/window.h>
 
+#if GTKMM_CHECK_VERSION(4, 0, 0)
+#include <gtkmm/listview.h>
+#endif
+
 #include <fmt/core.h>
 #include <fmt/format.h>
 
@@ -33,88 +39,6 @@
 #include <vector>
 
 #include <sys/types.h>
-
-/***
-****
-***/
-
-#ifndef GTKMM_CHECK_VERSION
-#define GTKMM_CHECK_VERSION(major, minor, micro) \
-    (GTKMM_MAJOR_VERSION > (major) || (GTKMM_MAJOR_VERSION == (major) && GTKMM_MINOR_VERSION > (minor)) || \
-     (GTKMM_MAJOR_VERSION == (major) && GTKMM_MINOR_VERSION == (minor) && GTKMM_MICRO_VERSION >= (micro)))
-#endif
-
-#ifndef GLIBMM_CHECK_VERSION
-#define GLIBMM_CHECK_VERSION(major, minor, micro) \
-    (GLIBMM_MAJOR_VERSION > (major) || (GLIBMM_MAJOR_VERSION == (major) && GLIBMM_MINOR_VERSION > (minor)) || \
-     (GLIBMM_MAJOR_VERSION == (major) && GLIBMM_MINOR_VERSION == (minor) && GLIBMM_MICRO_VERSION >= (micro)))
-#endif
-
-#ifndef PANGOMM_CHECK_VERSION
-#define PANGOMM_CHECK_VERSION(major, minor, micro) \
-    (PANGOMM_MAJOR_VERSION > (major) || (PANGOMM_MAJOR_VERSION == (major) && PANGOMM_MINOR_VERSION > (minor)) || \
-     (PANGOMM_MAJOR_VERSION == (major) && PANGOMM_MINOR_VERSION == (minor) && PANGOMM_MICRO_VERSION >= (micro)))
-#endif
-
-#if GTKMM_CHECK_VERSION(4, 0, 0)
-#define IF_GTKMM4(ThenValue, ElseValue) ThenValue
-#else
-#define IF_GTKMM4(ThenValue, ElseValue) ElseValue
-#endif
-
-#if GLIBMM_CHECK_VERSION(2, 68, 0)
-#define IF_GLIBMM2_68(ThenValue, ElseValue) ThenValue
-#else
-#define IF_GLIBMM2_68(ThenValue, ElseValue) ElseValue
-#endif
-
-#if PANGOMM_CHECK_VERSION(2, 48, 0)
-#define IF_PANGOMM2_48(ThenValue, ElseValue) ThenValue
-#else
-#define IF_PANGOMM2_48(ThenValue, ElseValue) ElseValue
-#endif
-
-#define TR_GTK_ALIGN(Code) IF_GTKMM4(Gtk::Align::Code, Gtk::ALIGN_##Code)
-#define TR_GTK_BUTTONS_TYPE(Code) IF_GTKMM4(Gtk::ButtonsType::Code, Gtk::BUTTONS_##Code)
-#define TR_GTK_CELL_RENDERER_STATE(Code) IF_GTKMM4(Gtk::CellRendererState::Code, Gtk::CELL_RENDERER_##Code)
-#define TR_GTK_FILE_CHOOSER_ACTION(Code) IF_GTKMM4(Gtk::FileChooser::Action::Code, Gtk::FILE_CHOOSER_ACTION_##Code)
-#define TR_GTK_MESSAGE_TYPE(Code) IF_GTKMM4(Gtk::MessageType::Code, Gtk::MESSAGE_##Code)
-#define TR_GTK_ORIENTATION(Code) IF_GTKMM4(Gtk::Orientation::Code, Gtk::ORIENTATION_##Code)
-#define TR_GTK_POLICY_TYPE(Code) IF_GTKMM4(Gtk::PolicyType::Code, Gtk::POLICY_##Code)
-#define TR_GTK_RESPONSE_TYPE(Code) IF_GTKMM4(Gtk::ResponseType::Code, Gtk::RESPONSE_##Code)
-#define TR_GTK_SELECTION_MODE(Code) IF_GTKMM4(Gtk::SelectionMode::Code, Gtk::SELECTION_##Code)
-#define TR_GTK_SORT_TYPE(Code) IF_GTKMM4(Gtk::SortType::Code, Gtk::SORT_##Code)
-#define TR_GTK_STATE_FLAGS(Code) IF_GTKMM4(Gtk::StateFlags::Code, Gtk::STATE_FLAG_##Code)
-#define TR_GTK_TREE_MODEL_FLAGS(Code) IF_GTKMM4(Gtk::TreeModel::Flags::Code, Gtk::TREE_MODEL_##Code)
-#define TR_GTK_TREE_VIEW_COLUMN_SIZING(Code) IF_GTKMM4(Gtk::TreeViewColumn::Sizing::Code, Gtk::TREE_VIEW_COLUMN_##Code)
-
-#define TR_GTK_TREE_MODEL_CHILD_ITER(Obj) IF_GTKMM4((Obj).get_iter(), (Obj))
-#define TR_GTK_WIDGET_GET_ROOT(Obj) IF_GTKMM4((Obj).get_root(), (Obj).get_toplevel())
-
-#define TR_GDK_COLORSPACE(Code) IF_GTKMM4(Gdk::Colorspace::Code, Gdk::COLORSPACE_##Code)
-#define TR_GDK_EVENT_TYPE(Code) IF_GTKMM4(Gdk::Event::Type::Code, GdkEventType::GDK_##Code)
-#define TR_GDK_DRAG_ACTION(Code) IF_GTKMM4(Gdk::DragAction::Code, Gdk::ACTION_##Code)
-#define TR_GDK_MODIFIED_TYPE(Code) IF_GTKMM4(Gdk::ModifierType::Code, GdkModifierType::GDK_##Code)
-
-#define TR_GLIB_FILE_TEST(Code) IF_GLIBMM2_68(Glib::FileTest::Code, Glib::FILE_TEST_##Code)
-#define TR_GLIB_NODE_TREE_TRAVERSE_FLAGS(Cls, Code) IF_GLIBMM2_68(Cls::TraverseFlags::Code, Cls::TRAVERSE_##Code)
-#define TR_GLIB_SPAWN_FLAGS(Code) IF_GLIBMM2_68(Glib::SpawnFlags::Code, Glib::SPAWN_##Code)
-#define TR_GLIB_USER_DIRECTORY(Code) IF_GLIBMM2_68(Glib::UserDirectory::Code, Glib::USER_DIRECTORY_##Code)
-
-#define TR_GLIB_EXCEPTION_WHAT(Obj) IF_GLIBMM2_68((Obj).what(), (Obj).what().c_str())
-
-#define TR_GIO_APP_INFO_CREATE_FLAGS(Code) IF_GLIBMM2_68(Gio::AppInfo::CreateFlags::Code, Gio::APP_INFO_CREATE_##Code)
-#define TR_GIO_APPLICATION_FLAGS(Code) IF_GLIBMM2_68(Gio::Application::Flags::Code, Gio::APPLICATION_##Code)
-#define TR_GIO_DBUS_BUS_TYPE(Code) IF_GLIBMM2_68(Gio::DBus::BusType::Code, Gio::DBus::BUS_TYPE_##Code)
-#define TR_GIO_DBUS_PROXY_FLAGS(Code) IF_GLIBMM2_68(Gio::DBus::ProxyFlags::Code, Gio::DBus::PROXY_FLAGS_##Code)
-#define TR_GIO_FILE_MONITOR_EVENT(Code) IF_GLIBMM2_68(Gio::FileMonitor::Event::Code, Gio::FILE_MONITOR_EVENT_##Code)
-
-#define TR_CAIRO_SURFACE_FORMAT(Code) IF_GTKMM4(Cairo::Surface::Format::Code, Cairo::FORMAT_##Code)
-#define TR_CAIRO_CONTEXT_OPERATOR(Code) IF_GTKMM4(Cairo::Context::Operator::Code, Cairo::OPERATOR_##Code)
-
-#define TR_PANGO_ALIGNMENT(Code) IF_PANGOMM2_48(Pango::Alignment::Code, Pango::ALIGN_##Code)
-#define TR_PANGO_ELLIPSIZE_MODE(Code) IF_PANGOMM2_48(Pango::EllipsizeMode::Code, Pango::ELLIPSIZE_##Code)
-#define TR_PANGO_WEIGHT(Code) IF_PANGOMM2_48(Pango::Weight::Code, Pango::WEIGHT_##Code)
 
 /***
 ****
@@ -226,9 +150,20 @@ bool on_tree_view_button_pressed(
     double event_y,
     bool context_menu_requested,
     std::function<void(double, double)> const& callback = {});
+#if GTKMM_CHECK_VERSION(4, 0, 0)
+bool on_list_view_button_pressed(
+    Gtk::ListView& view,
+    double event_x,
+    double event_y,
+    bool context_menu_requested,
+    std::function<void(double, double)> const& callback = {});
+#endif
 
 /* if the click didn't specify a row, clear the selection */
 bool on_tree_view_button_released(Gtk::TreeView& view, double event_x, double event_y);
+#if GTKMM_CHECK_VERSION(4, 0, 0)
+bool on_list_view_button_released(Gtk::ListView& view, double event_x, double event_y);
+#endif
 
 using TrGdkModifierType = IF_GTKMM4(Gdk::ModifierType, guint);
 
@@ -236,6 +171,12 @@ void setup_tree_view_button_event_handling(
     Gtk::TreeView& view,
     std::function<bool(guint, TrGdkModifierType, double, double, bool)> const& press_callback,
     std::function<bool(double, double)> const& release_callback);
+#if GTKMM_CHECK_VERSION(4, 0, 0)
+void setup_list_view_button_event_handling(
+    Gtk::ListView& view,
+    std::function<bool(guint, TrGdkModifierType, double, double, bool)> const& press_callback,
+    std::function<bool(double, double)> const& release_callback);
+#endif
 
 /* move a file to the trashcan if GIO is available; otherwise, delete it */
 bool gtr_file_trash_or_remove(std::string const& filename, tr_error** error);
@@ -410,6 +351,12 @@ template<typename T>
 inline bool operator!=(RefPtr<T> const& lhs, std::nullptr_t /*rhs*/)
 {
     return !(lhs == nullptr);
+}
+
+template<typename T>
+inline T& operator*(RefPtr<T> const& ptr)
+{
+    return *ptr.get();
 }
 
 template<typename T>

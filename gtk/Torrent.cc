@@ -5,6 +5,7 @@
 
 #include "Torrent.h"
 
+#include "DynamicProperty.h"
 #include "IconCache.h"
 #include "Utils.h"
 
@@ -84,6 +85,19 @@ std::string_view get_mime_type(tr_torrent const& torrent)
     return name.find('/') != std::string_view::npos ? DirectoryMimeType : tr_get_mime_type_for_filename(name);
 }
 
+std::string_view get_activity_direction(tr_torrent_activity activity)
+{
+    switch (activity)
+    {
+    case TR_STATUS_DOWNLOAD:
+        return "down"sv;
+    case TR_STATUS_SEED:
+        return "up"sv;
+    default:
+        return "idle"sv;
+    }
+}
+
 } // namespace
 
 Torrent::Columns::Columns()
@@ -95,6 +109,27 @@ Torrent::Columns::Columns()
 class Torrent::Impl
 {
 public:
+    enum Property : guint
+    {
+        ICON = 1,
+        NAME,
+        PERCENT_DONE,
+        SHORT_STATUS,
+        LONG_PROGRESS,
+        LONG_STATUS,
+        SENSITIVE,
+        CSS_CLASSES,
+    };
+
+    using IconProperty = PropertyTraits<Torrent, Property::ICON, Glib::RefPtr<Gio::Icon>>;
+    using NameProperty = PropertyTraits<Torrent, Property::NAME, Glib::ustring>;
+    using PercentDoneProperty = PropertyTraits<Torrent, Property::PERCENT_DONE, float>;
+    using ShortStatusProperty = PropertyTraits<Torrent, Property::SHORT_STATUS, Glib::ustring>;
+    using LongProgressProperty = PropertyTraits<Torrent, Property::LONG_PROGRESS, Glib::ustring>;
+    using LongStatusProperty = PropertyTraits<Torrent, Property::LONG_STATUS, Glib::ustring>;
+    using SensitiveProperty = PropertyTraits<Torrent, Property::SENSITIVE, bool>;
+    using CssClassesProperty = PropertyTraits<Torrent, Property::CSS_CLASSES, std::vector<Glib::ustring>>;
+
     struct Cache
     {
         Glib::ustring error_message;
@@ -166,23 +201,80 @@ public:
     void notify_property_changes(ChangeFlags changes) const;
 
     void get_value(int column, Glib::ValueBase& value) const;
+    void get_property(Property property, Glib::ValueBase& value) const;
 
     [[nodiscard]] Glib::RefPtr<Gio::Icon> get_icon() const;
     [[nodiscard]] Glib::ustring get_short_status_text() const;
     [[nodiscard]] Glib::ustring get_long_progress_text() const;
     [[nodiscard]] Glib::ustring get_long_status_text() const;
+    [[nodiscard]] std::vector<Glib::ustring> get_css_classes() const;
+
+    static void class_init(void* cls, void* user_data);
+    static void instance_init(GTypeInstance* instance, void* cls);
 
 private:
     [[nodiscard]] Glib::ustring get_short_transfer_text() const;
     [[nodiscard]] Glib::ustring get_error_text() const;
     [[nodiscard]] Glib::ustring get_activity_text() const;
 
+    static void get_property(GObject* object, unsigned int property_id, GValue* value, GParamSpec* param_spec);
+
 private:
     Torrent& torrent_;
     tr_torrent* const raw_torrent_;
 
     Cache cache_;
+
+    static DynamicProperty<IconProperty> property_icon_;
+    static DynamicProperty<NameProperty> property_name_;
+    static DynamicProperty<PercentDoneProperty> property_percent_done_;
+    static DynamicProperty<ShortStatusProperty> property_short_status_;
+    static DynamicProperty<LongProgressProperty> property_long_progress_;
+    static DynamicProperty<LongStatusProperty> property_long_status_;
+    static DynamicProperty<SensitiveProperty> property_sensitive_;
+    static DynamicProperty<CssClassesProperty> property_css_classes_;
 };
+
+DynamicProperty<Torrent::Impl::IconProperty> Torrent::Impl::property_icon_(
+    "icon",
+    "Icon",
+    "Icon based on torrent's likely MIME type",
+    &Torrent::get_icon);
+DynamicProperty<Torrent::Impl::NameProperty> Torrent::Impl::property_name_(
+    "name",
+    "Name",
+    "Torrent name / title",
+    &Torrent::get_name);
+DynamicProperty<Torrent::Impl::PercentDoneProperty> Torrent::Impl::property_percent_done_(
+    "percent-done",
+    "Percent done",
+    "Percent done (0..1) for current activity (leeching or seeding)",
+    &Torrent::get_percent_done);
+DynamicProperty<Torrent::Impl::ShortStatusProperty> Torrent::Impl::property_short_status_(
+    "short-status",
+    "Short status",
+    "Status text displayed in compact view mode",
+    &Torrent::get_short_status_text);
+DynamicProperty<Torrent::Impl::LongProgressProperty> Torrent::Impl::property_long_progress_(
+    "long-progress",
+    "Long progress",
+    "Progress text displayed in full view mode",
+    &Torrent::get_long_progress_text);
+DynamicProperty<Torrent::Impl::LongStatusProperty> Torrent::Impl::property_long_status_(
+    "long-status",
+    "Long status",
+    "Status text displayed in full view mode",
+    &Torrent::get_long_status_text);
+DynamicProperty<Torrent::Impl::SensitiveProperty> Torrent::Impl::property_sensitive_(
+    "sensitive",
+    "Sensitive",
+    "Visual sensitivity of the view item, unrelated to activation possibility",
+    &Torrent::get_sensitive);
+DynamicProperty<Torrent::Impl::CssClassesProperty> Torrent::Impl::property_css_classes_(
+    "css-classes",
+    "CSS classes",
+    "CSS class names used for styling view items",
+    &Torrent::get_css_classes);
 
 Torrent::Impl::Impl(Torrent& torrent, tr_torrent* raw_torrent)
     : torrent_(torrent)
@@ -292,7 +384,64 @@ void Torrent::Impl::notify_property_changes(ChangeFlags changes) const
         return;
     }
 
+#if GTKMM_CHECK_VERSION(4, 0, 0)
+
+    static auto constexpr short_status_flags = ChangeFlag::ACTIVE_PEERS_DOWN | ChangeFlag::ACTIVE_PEERS_UP |
+        ChangeFlag::ACTIVITY | ChangeFlag::FINISHED | ChangeFlag::RATIO | ChangeFlag::RECHECK_PROGRESS |
+        ChangeFlag::SPEED_DOWN | ChangeFlag::SPEED_UP;
+    static auto constexpr long_progress_flags = ChangeFlag::ACTIVITY | ChangeFlag::ETA | ChangeFlag::LONG_PROGRESS |
+        ChangeFlag::PERCENT_COMPLETE | ChangeFlag::PERCENT_DONE | ChangeFlag::RATIO | ChangeFlag::TOTAL_SIZE;
+    static auto constexpr long_status_flags = ChangeFlag::ACTIVE_PEERS_DOWN | ChangeFlag::ACTIVE_PEERS_UP |
+        ChangeFlag::ACTIVITY | ChangeFlag::ERROR_CODE | ChangeFlag::ERROR_MESSAGE | ChangeFlag::HAS_METADATA |
+        ChangeFlag::LONG_STATUS | ChangeFlag::SPEED_DOWN | ChangeFlag::SPEED_UP | ChangeFlag::STALLED;
+    static auto constexpr css_classes_flags = ChangeFlag::ACTIVITY | ChangeFlag::ERROR_CODE;
+
+    if (changes.test(ChangeFlag::MIME_TYPE))
+    {
+        property_icon_.notify_changed(torrent_);
+    }
+
+    if (changes.test(ChangeFlag::NAME))
+    {
+        property_name_.notify_changed(torrent_);
+    }
+
+    if (changes.test(ChangeFlag::PERCENT_DONE))
+    {
+        property_percent_done_.notify_changed(torrent_);
+    }
+
+    if (changes.test(short_status_flags))
+    {
+        property_short_status_.notify_changed(torrent_);
+    }
+
+    if (changes.test(long_progress_flags))
+    {
+        property_long_progress_.notify_changed(torrent_);
+    }
+
+    if (changes.test(long_status_flags))
+    {
+        property_long_status_.notify_changed(torrent_);
+    }
+
+    if (changes.test(ChangeFlag::ACTIVITY))
+    {
+        property_sensitive_.notify_changed(torrent_);
+    }
+
+    if (changes.test(css_classes_flags))
+    {
+        property_css_classes_.notify_changed(torrent_);
+    }
+
+#else
+
+    // Reduce redraws by emitting non-detailed signal once for all changes
     gtr_object_notify_emit(torrent_);
+
+#endif
 }
 
 void Torrent::Impl::get_value(int column, Glib::ValueBase& value) const
@@ -306,6 +455,44 @@ void Torrent::Impl::get_value(int column, Glib::ValueBase& value) const
     else if (column == columns.name_collated.index())
     {
         column_value_cast(value, columns.name_collated).set(cache_.name_collated);
+    }
+}
+
+void Torrent::Impl::get_property(Property property, Glib::ValueBase& value) const
+{
+    switch (property)
+    {
+    case IconProperty::Index:
+        property_icon_.get_value(torrent_, value);
+        break;
+
+    case NameProperty::Index:
+        property_name_.get_value(torrent_, value);
+        break;
+
+    case PercentDoneProperty::Index:
+        property_percent_done_.get_value(torrent_, value);
+        break;
+
+    case ShortStatusProperty::Index:
+        property_short_status_.get_value(torrent_, value);
+        break;
+
+    case LongProgressProperty::Index:
+        property_long_progress_.get_value(torrent_, value);
+        break;
+
+    case LongStatusProperty::Index:
+        property_long_status_.get_value(torrent_, value);
+        break;
+
+    case SensitiveProperty::Index:
+        property_sensitive_.get_value(torrent_, value);
+        break;
+
+    case CssClassesProperty::Index:
+        property_css_classes_.get_value(torrent_, value);
+        break;
     }
 }
 
@@ -452,6 +639,39 @@ Glib::ustring Torrent::Impl::get_long_status_text() const
     return status_str;
 }
 
+std::vector<Glib::ustring> Torrent::Impl::get_css_classes() const
+{
+    auto result = std::vector<Glib::ustring>({
+        fmt::format("tr-transfer-{}", get_activity_direction(cache_.activity)),
+    });
+
+    if (cache_.error_code != 0)
+    {
+        result.push_back("tr-error");
+    }
+
+    return result;
+}
+
+void Torrent::Impl::class_init(void* cls, void* /*user_data*/)
+{
+    auto* const object_cls = G_OBJECT_CLASS(cls);
+    object_cls->get_property = &Impl::get_property;
+
+    property_icon_.install(object_cls);
+    property_name_.install(object_cls);
+    property_percent_done_.install(object_cls);
+    property_short_status_.install(object_cls);
+    property_long_progress_.install(object_cls);
+    property_long_status_.install(object_cls);
+    property_sensitive_.install(object_cls);
+    property_css_classes_.install(object_cls);
+}
+
+void Torrent::Impl::instance_init(GTypeInstance* /*instance*/, void* /*cls*/)
+{
+}
+
 Glib::ustring Torrent::Impl::get_short_transfer_text() const
 {
     if (cache_.has_metadata && cache_.active_peers_down > 0)
@@ -561,13 +781,23 @@ Glib::ustring Torrent::Impl::get_activity_text() const
     }
 }
 
+void Torrent::Impl::get_property(GObject* object, unsigned int property_id, GValue* value, GParamSpec* /*param_spec*/)
+{
+    if (auto const* const torrent = dynamic_cast<Torrent const*>(Glib::wrap_auto(object)); torrent != nullptr)
+    {
+        torrent->impl_->get_property(Property{ property_id }, *reinterpret_cast<Glib::ValueBase*>(value));
+    }
+}
+
 Torrent::Torrent()
     : Glib::ObjectBase(typeid(Torrent))
+    , ExtraClassInit(&Impl::class_init, nullptr, &Impl::instance_init)
 {
 }
 
 Torrent::Torrent(tr_torrent* torrent)
     : Glib::ObjectBase(typeid(Torrent))
+    , ExtraClassInit(&Impl::class_init, nullptr, &Impl::instance_init)
     , impl_(std::make_unique<Impl>(*this, torrent))
 {
     g_assert(torrent != nullptr);
@@ -721,6 +951,11 @@ Glib::ustring Torrent::get_long_status_text() const
 bool Torrent::get_sensitive() const
 {
     return impl_->get_cache().activity != TR_STATUS_STOPPED;
+}
+
+std::vector<Glib::ustring> Torrent::get_css_classes() const
+{
+    return impl_->get_css_classes();
 }
 
 Torrent::ChangeFlags Torrent::update()
